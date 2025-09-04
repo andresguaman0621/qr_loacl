@@ -76,48 +76,29 @@
       color: #0056b3;
       border: 2px solid #b3d9ff;
     }
-    #sync-info {
-      margin-top: 1rem;
-      font-size: 0.9em;
-      color: #6c757d;
-      background: #f8f9fa;
-      padding: 0.8rem;
-      border-radius: 8px;
-      border-left: 4px solid #007bff;
-    }
-    #debug-panel {
+    .datetime {
       margin-top: 1.5rem;
-      padding: 1rem;
-      background: #f1f3f5;
-      border-radius: 10px;
-      font-size: 0.85em;
-      color: #495057;
-      text-align: left;
-      display: none;
-      border: 1px solid #dee2e6;
-    }
-    .debug-toggle {
-      margin-top: 1rem;
-      padding: 0.6rem 1.2rem;
-      background: #6c757d;
+      padding: 1.2rem;
+      background: linear-gradient(135deg, #2c3e50, #34495e);
+      border-radius: 15px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+      border: 2px solid #3498db;
       color: white;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 0.85em;
-      transition: background 0.3s ease;
     }
-    .debug-toggle:hover {
-      background: #5a6268;
+    .date-display {
+      font-size: 1.8em;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+      color: #3498db;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
     }
-    .security-notice {
-      margin-top: 1rem;
-      padding: 0.8rem;
-      background: #f8f4e6;
-      border: 1px solid #f0e68c;
-      border-radius: 8px;
-      font-size: 0.85em;
-      color: #8b7355;
+    .time-display {
+      font-size: 3em;
+      font-weight: bold;
+      color: #ecf0f1;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+      letter-spacing: 2px;
+      font-family: 'Courier New', monospace;
     }
   </style>
 </head>
@@ -133,93 +114,68 @@
       ✅ QR Activo - Listo para escanear
     </div>
     
-    <div id="sync-info">
-      🔄 Sincronización: Conectando...
-    </div>
     
-    <div class="security-notice">
-      🛡️ <strong>Seguridad:</strong> QR válido solo por 10 segundos. No se aceptan capturas de pantalla.
-    </div>
-    
-    <button class="debug-toggle" onclick="toggleDebug()">
-      🔍 Toggle Debug
-    </button>
-    
-    <div id="debug-panel">
-      <strong>🔍 Debug Info:</strong><br>
-      <div id="debug-content">Cargando...</div>
+    <div id="datetime" class="datetime">
+      <div id="date-display" class="date-display">Cargando fecha...</div>
+      <div id="time-display" class="time-display">Cargando hora...</div>
     </div>
   </div>
 
   <script>
     const countdownEl = document.getElementById('countdown');
-    const qrImg       = document.getElementById('qr-img');
-    const statusEl    = document.getElementById('status');
-    const syncInfo    = document.getElementById('sync-info');
-    const debugPanel  = document.getElementById('debug-panel');
-    const debugContent = document.getElementById('debug-content');
-    const baseQR      = "{{ url_for('qr_image') }}";
+    const qrImg = document.getElementById('qr-img');
+    const statusEl = document.getElementById('status');
+    const dateDisplay = document.getElementById('date-display');
+    const timeDisplay = document.getElementById('time-display');
+    const baseQR = "{{ url_for('qr_image') }}";
     
-    let debugMode = false;
     let refreshTimer = null;
     let countdownTimer = null;
-    let debugTimer = null;
-    let syncTimer = null;
-    let serverTimeOffset = 0; // Diferencia entre tiempo servidor y cliente
+    let datetimeTimer = null;
 
-    // ⭐ SINCRONIZACIÓN PRECISA CON SERVIDOR
-    async function sincronizarConServidor() {
-      try {
-        const clienteAntes = Date.now();
-        const response = await fetch('/api/timing');
-        const clienteDespues = Date.now();
-        const data = await response.json();
-        
-        // Calcular latencia y offset
-        const latencia = (clienteDespues - clienteAntes) / 2;
-        const tiempoServidor = new Date(data.timestamp_servidor).getTime();
-        const tiempoCliente = clienteAntes + latencia;
-        serverTimeOffset = tiempoServidor - tiempoCliente;
-        
-        syncInfo.innerHTML = `🔄 Sincronizado - Latencia: ${latencia.toFixed(0)}ms, Offset: ${serverTimeOffset.toFixed(0)}ms`;
-        
-        // Usar timing del servidor para próximo refresh
-        const msHastaRefresh = data.ms_hasta_refresh;
-        scheduleNextRefresh(msHastaRefresh);
-        
-        console.log(`🔄 Sincronización: Latencia=${latencia}ms, Offset=${serverTimeOffset}ms, Próximo refresh en ${msHastaRefresh}ms`);
-        
-      } catch (error) {
-        console.error('❌ Error sincronizando con servidor:', error);
-        syncInfo.innerHTML = `⚠️ Error de sincronización - Usando tiempo local`;
-        // Fallback a cálculo local
-        scheduleNextRefresh(msUntilNextBucketLocal());
-      }
+    // Actualizar fecha y hora en tiempo real
+    function updateDateTime() {
+      const now = new Date();
+      
+      // Formatear fecha
+      const dateOptions = { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      };
+      const dateStr = now.toLocaleDateString('es-EC', dateOptions);
+      
+      // Formatear hora
+      const timeStr = now.toLocaleTimeString('es-EC', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+      
+      dateDisplay.innerText = dateStr;
+      timeDisplay.innerText = timeStr;
     }
 
-    // Cálculo local como fallback (mismo que tu código original)
-    function msUntilNextBucketLocal() {
+    // Cálculo local para próximo bucket de 10 segundos
+    function msUntilNextBucket() {
       const now = new Date();
       const sec = now.getSeconds();
-      const ms  = now.getMilliseconds();
+      const ms = now.getMilliseconds();
       const rem = 10 - (sec % 10);
       return rem * 1000 - ms;
     }
 
-    // Tiempo sincronizado con servidor
-    function getTiempoSincronizado() {
-      return new Date(Date.now() + serverTimeOffset);
-    }
-
-    // Actualizar countdown con tiempo sincronizado
+    // Actualizar countdown
     function updateCountdown() {
-      const now = getTiempoSincronizado();
+      const now = new Date();
       const sec = now.getSeconds();
       const rem = 10 - (sec % 10);
       
       countdownEl.innerText = `Nuevo QR en ${rem}s`;
       
-      // Estados visuales mejorados
+      // Estados visuales
       if (rem <= 1) {
         statusEl.className = 'status warning';
         statusEl.innerHTML = '⚠️ QR expirando...';
@@ -235,7 +191,7 @@
       }
     }
 
-    // Actualizar solo la imagen del QR con feedback visual mejorado
+    // Actualizar imagen del QR
     function refreshQR() {
       console.log('🔄 Refrescando QR...');
       
@@ -250,100 +206,56 @@
       // Precargar nueva imagen
       const newImg = new Image();
       newImg.onload = function() {
-        // Actualizar imagen mostrada
         qrImg.src = newSrc;
         qrImg.classList.remove('updating');
         console.log('✅ QR actualizado exitosamente');
         
-        // Re-sincronizar después de cada actualización
-        setTimeout(sincronizarConServidor, 100);
+        // Programar próxima actualización
+        scheduleNextRefresh();
       };
       newImg.onerror = function() {
         console.error('❌ Error cargando nuevo QR');
         qrImg.classList.remove('updating');
         statusEl.className = 'status warning';
         statusEl.innerHTML = '⚠️ Error actualizando QR';
+        
+        // Reintentar en 5 segundos
+        setTimeout(() => scheduleNextRefresh(), 5000);
       };
       
       newImg.src = newSrc;
     }
 
-    // Programar próxima actualización con timing del servidor
-    function scheduleNextRefresh(msToWait) {
+    // Programar próxima actualización
+    function scheduleNextRefresh() {
       if (refreshTimer) {
         clearTimeout(refreshTimer);
       }
       
+      const msToWait = msUntilNextBucket();
       console.log(`⏰ Próxima actualización en ${msToWait}ms`);
       
       refreshTimer = setTimeout(() => {
         refreshQR();
-        // Después de cada refresh, volver a sincronizar
-        setTimeout(sincronizarConServidor, 500);
       }, msToWait);
     }
 
-    // Actualizar info de debug con datos de sincronización
-    function updateDebugInfo() {
-      if (!debugMode) return;
+    // Inicializar sistema
+    function initializeSystem() {
+      console.log('🚀 Inicializando sistema de QR...');
       
-      fetch('/debug/token')
-        .then(res => res.json())
-        .then(data => {
-          const now = getTiempoSincronizado();
-          debugContent.innerHTML = `
-            <strong>Servidor:</strong><br>
-            • Timestamp: ${data.timestamp_actual}<br>
-            • Bucket segundo: ${data.bucket_segundo}s<br>
-            • Segundos en bucket: ${data.segundos_en_bucket}<br>
-            • Segundos restantes: ${data.segundos_restantes}<br>
-            • Micro-tolerancia: ${data.micro_tolerancia_activa ? 'SÍ' : 'NO'}<br>
-            <br>
-            <strong>Cliente sincronizado:</strong><br>
-            • Tiempo local: ${now.toISOString()}<br>
-            • Offset servidor: ${serverTimeOffset.toFixed(0)}ms<br>
-            <br>
-            <strong>Tokens:</strong><br>
-            • Actual: ${data.token_actual.substring(0, 12)}...<br>
-            • Anterior: ${data.token_anterior.substring(0, 12)}...<br>
-            • Global: ${data.current_token_global || 'null'}
-          `;
-        })
-        .catch(err => {
-          debugContent.innerHTML = '<span style="color: red;">❌ Error cargando debug info</span>';
-        });
-    }
-
-    function toggleDebug() {
-      debugMode = !debugMode;
-      debugPanel.style.display = debugMode ? 'block' : 'none';
+      // Iniciar fecha y hora
+      updateDateTime();
+      datetimeTimer = setInterval(updateDateTime, 1000);
       
-      if (debugMode) {
-        updateDebugInfo();
-        debugTimer = setInterval(updateDebugInfo, 1000);
-      } else {
-        if (debugTimer) {
-          clearInterval(debugTimer);
-          debugTimer = null;
-        }
-      }
-    }
-
-    // ⭐ INICIALIZACIÓN DEL SISTEMA COMPLETO
-    async function initializeSystem() {
-      console.log('🚀 Inicializando sistema de QR con sincronización precisa...');
-      
-      // 1. Sincronizar con servidor primero
-      await sincronizarConServidor();
-      
-      // 2. Iniciar countdown preciso
+      // Iniciar countdown
       updateCountdown();
-      countdownTimer = setInterval(updateCountdown, 100); // Cada 100ms
+      countdownTimer = setInterval(updateCountdown, 100);
       
-      // 3. Re-sincronizar cada 30 segundos para mantener precisión
-      syncTimer = setInterval(sincronizarConServidor, 30000);
+      // Programar primera actualización
+      scheduleNextRefresh();
       
-      console.log('✅ Sistema inicializado con sincronización precisa');
+      console.log('✅ Sistema inicializado');
     }
 
     // Event listeners
@@ -357,15 +269,14 @@
       statusEl.innerHTML = '⚠️ Error cargando QR';
     });
 
-    // Limpiar todos los timers al salir
+    // Limpiar timers al salir
     window.addEventListener('beforeunload', () => {
       if (refreshTimer) clearTimeout(refreshTimer);
       if (countdownTimer) clearInterval(countdownTimer);
-      if (debugTimer) clearInterval(debugTimer);
-      if (syncTimer) clearInterval(syncTimer);
+      if (datetimeTimer) clearInterval(datetimeTimer);
     });
 
-    // Inicializar cuando la página esté completamente cargada
+    // Inicializar cuando la página esté lista
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', initializeSystem);
     } else {
