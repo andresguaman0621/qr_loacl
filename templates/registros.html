@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Administraci車n de Timbradas</title>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; }
+    form { margin-bottom: 1.5rem; }
+    input, button { padding: 0.4rem; font-size: 1rem; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { border: 1px solid #ccc; padding: 0.5rem; text-align: left; }
+    th { background: #f4f4f4; }
+  </style>
+</head>
+<body>
+  <h1>Administraci車n de Timbradas</h1>
+
+  <form method="get" action="{{ url_for('ver_registros') }}">
+    <label>
+      C谷dula:
+      <input type="text" name="cedula" value="{{ cedula }}">
+    </label>
+    &nbsp;
+    <label>
+      Desde:
+      <input type="date" name="start_date" value="{{ start_date }}">
+    </label>
+    &nbsp;
+    <label>
+      Hasta:
+      <input type="date" name="end_date" value="{{ end_date }}">
+    </label>
+    &nbsp;
+    <button type="submit">Filtrar</button>
+    <a href="{{ url_for('ver_registros') }}">
+  <button type="button">Mostrar hoy</button>
+</a>
+
+  </form>
+
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>C谷dula</th>
+        <th>Token QR</th>
+        <th>Fecha y Hora</th>
+      </tr>
+    </thead>
+    <tbody>
+  {% for row in registros %}
+  <tr>
+    <td>{{ row.id }}</td>
+    <td>{{ row.cedula }}</td>
+    <td>{{ row.token }}</td>
+    <td>{{ row.fecha_hora }}</td>
+  </tr>
+  {% else %}
+  <tr>
+    <td colspan="4" style="text-align:center;">No hay registros.</td>
+  </tr>
+  {% endfor %}
+</tbody>
+
+  </table>
+</body>
+</html>

@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Escanea este QR</title>
+  <style>
+    body { 
+      text-align: center; 
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding: 2rem; 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      margin: 0;
+    }
+    .container {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 20px;
+      padding: 2.5rem;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+      backdrop-filter: blur(10px);
+      max-width: 450px;
+      margin: 0 auto;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    h2 {
+      color: #2c3e50;
+      margin-bottom: 1rem;
+      font-size: 1.8em;
+      font-weight: 600;
+    }
+    #countdown { 
+      font-size: 2em; 
+      margin-bottom: 1.5rem; 
+      color: #27ae60;
+      font-weight: bold;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+    }
+    #qr-img { 
+      max-width: 100%; 
+      height: auto; 
+      border: 4px solid #34495e; 
+      border-radius: 15px; 
+      transition: all 0.3s ease;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+    }
+    #qr-img.updating {
+      opacity: 0.7;
+      transform: scale(0.98);
+      filter: blur(1px);
+    }
+    .status {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      border-radius: 10px;
+      font-size: 1em;
+      font-weight: 500;
+      transition: all 0.3s ease;
+    }
+    .status.active {
+      background: #d4edda;
+      color: #155724;
+      border: 2px solid #c3e6cb;
+    }
+    .status.warning {
+      background: #fff3cd;
+      color: #856404;
+      border: 2px solid #ffeaa7;
+    }
+    .status.updating {
+      background: #cce5ff;
+      color: #0066cc;
+      border: 2px solid #99ccff;
+    }
+    .status.sync {
+      background: #e7f3ff;
+      color: #0056b3;
+      border: 2px solid #b3d9ff;
+    }
+    #sync-info {
+      margin-top: 1rem;
+      font-size: 0.9em;
+      color: #6c757d;
+      background: #f8f9fa;
+      padding: 0.8rem;
+      border-radius: 8px;
+      border-left: 4px solid #007bff;
+    }
+    #debug-panel {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      background: #f1f3f5;
+      border-radius: 10px;
+      font-size: 0.85em;
+      color: #495057;
+      text-align: left;
+      display: none;
+      border: 1px solid #dee2e6;
+    }
+    .debug-toggle {
+      margin-top: 1rem;
+      padding: 0.6rem 1.2rem;
+      background: #6c757d;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85em;
+      transition: background 0.3s ease;
+    }
+    .debug-toggle:hover {
+      background: #5a6268;
+    }
+    .security-notice {
+      margin-top: 1rem;
+      padding: 0.8rem;
+      background: #f8f4e6;
+      border: 1px solid #f0e68c;
+      border-radius: 8px;
+      font-size: 0.85em;
+      color: #8b7355;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🔒 QR de Timbrado MMQEP</h2>
+    <div id="countdown">Cargando...</div>
+    <img id="qr-img"
+         src="{{ url_for('qr_image') }}?b={{ bust }}"
+         alt="QR actual">
+    
+    <div id="status" class="status active">
+      ✅ QR Activo - Listo para escanear
+    </div>
+    
+    <div id="sync-info">
+      🔄 Sincronización: Conectando...
+    </div>
+    
+    <div class="security-notice">
+      🛡️ <strong>Seguridad:</strong> QR válido solo por 10 segundos. No se aceptan capturas de pantalla.
+    </div>
+    
+    <button class="debug-toggle" onclick="toggleDebug()">
+      🔍 Toggle Debug
+    </button>
+    
+    <div id="debug-panel">
+      <strong>🔍 Debug Info:</strong><br>
+      <div id="debug-content">Cargando...</div>
+    </div>
+  </div>
+
+  <script>
+    const countdownEl = document.getElementById('countdown');
+    const qrImg       = document.getElementById('qr-img');
+    const statusEl    = document.getElementById('status');
+    const syncInfo    = document.getElementById('sync-info');
+    const debugPanel  = document.getElementById('debug-panel');
+    const debugContent = document.getElementById('debug-content');
+    const baseQR      = "{{ url_for('qr_image') }}";
+    
+    let debugMode = false;
+    let refreshTimer = null;
+    let countdownTimer = null;
+    let debugTimer = null;
+    let syncTimer = null;
+    let serverTimeOffset = 0; // Diferencia entre tiempo servidor y cliente
+
+    // ⭐ SINCRONIZACIÓN PRECISA CON SERVIDOR
+    async function sincronizarConServidor() {
+      try {
+        const clienteAntes = Date.now();
+        const response = await fetch('/api/timing');
+        const clienteDespues = Date.now();
+        const data = await response.json();
+        
+        // Calcular latencia y offset
+        const latencia = (clienteDespues - clienteAntes) / 2;
+        const tiempoServidor = new Date(data.timestamp_servidor).getTime();
+        const tiempoCliente = clienteAntes + latencia;
+        serverTimeOffset = tiempoServidor - tiempoCliente;
+        
+        syncInfo.innerHTML = `🔄 Sincronizado - Latencia: ${latencia.toFixed(0)}ms, Offset: ${serverTimeOffset.toFixed(0)}ms`;
+        
+        // Usar timing del servidor para próximo refresh
+        const msHastaRefresh = data.ms_hasta_refresh;
+        scheduleNextRefresh(msHastaRefresh);
+        
+        console.log(`🔄 Sincronización: Latencia=${latencia}ms, Offset=${serverTimeOffset}ms, Próximo refresh en ${msHastaRefresh}ms`);
+        
+      } catch (error) {
+        console.error('❌ Error sincronizando con servidor:', error);
+        syncInfo.innerHTML = `⚠️ Error de sincronización - Usando tiempo local`;
+        // Fallback a cálculo local
+        scheduleNextRefresh(msUntilNextBucketLocal());
+      }
+    }
+
+    // Cálculo local como fallback (mismo que tu código original)
+    function msUntilNextBucketLocal() {
+      const now = new Date();
+      const sec = now.getSeconds();
+      const ms  = now.getMilliseconds();
+      const rem = 10 - (sec % 10);
+      return rem * 1000 - ms;
+    }
+
+    // Tiempo sincronizado con servidor
+    function getTiempoSincronizado() {
+      return new Date(Date.now() + serverTimeOffset);
+    }
+
+    // Actualizar countdown con tiempo sincronizado
+    function updateCountdown() {
+      const now = getTiempoSincronizado();
+      const sec = now.getSeconds();
+      const rem = 10 - (sec % 10);
+      
+      countdownEl.innerText = `Nuevo QR en ${rem}s`;
+      
+      // Estados visuales mejorados
+      if (rem <= 1) {
+        statusEl.className = 'status warning';
+        statusEl.innerHTML = '⚠️ QR expirando...';
+      } else if (qrImg.classList.contains('updating')) {
+        statusEl.className = 'status updating';
+        statusEl.innerHTML = '🔄 Actualizando QR...';
+      } else if (rem <= 3) {
+        statusEl.className = 'status sync';
+        statusEl.innerHTML = '🔄 Preparando nuevo QR...';
+      } else {
+        statusEl.className = 'status active';
+        statusEl.innerHTML = '✅ QR Activo - Listo para escanear';
+      }
+    }
+
+    // Actualizar solo la imagen del QR con feedback visual mejorado
+    function refreshQR() {
+      console.log('🔄 Refrescando QR...');
+      
+      // Efecto visual de actualización
+      qrImg.classList.add('updating');
+      statusEl.className = 'status updating';
+      statusEl.innerHTML = '🔄 Generando nuevo QR...';
+      
+      // URL con timestamp único para evitar cache
+      const newSrc = baseQR + '?b=' + Date.now() + '&r=' + Math.random();
+      
+      // Precargar nueva imagen
+      const newImg = new Image();
+      newImg.onload = function() {
+        // Actualizar imagen mostrada
+        qrImg.src = newSrc;
+        qrImg.classList.remove('updating');
+        console.log('✅ QR actualizado exitosamente');
+        
+        // Re-sincronizar después de cada actualización
+        setTimeout(sincronizarConServidor, 100);
+      };
+      newImg.onerror = function() {
+        console.error('❌ Error cargando nuevo QR');
+        qrImg.classList.remove('updating');
+        statusEl.className = 'status warning';
+        statusEl.innerHTML = '⚠️ Error actualizando QR';
+      };
+      
+      newImg.src = newSrc;
+    }
+
+    // Programar próxima actualización con timing del servidor
+    function scheduleNextRefresh(msToWait) {
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+      }
+      
+      console.log(`⏰ Próxima actualización en ${msToWait}ms`);
+      
+      refreshTimer = setTimeout(() => {
+        refreshQR();
+        // Después de cada refresh, volver a sincronizar
+        setTimeout(sincronizarConServidor, 500);
+      }, msToWait);
+    }
+
+    // Actualizar info de debug con datos de sincronización
+    function updateDebugInfo() {
+      if (!debugMode) return;
+      
+      fetch('/debug/token')
+        .then(res => res.json())
+        .then(data => {
+          const now = getTiempoSincronizado();
+          debugContent.innerHTML = `
+            <strong>Servidor:</strong><br>
+            • Timestamp: ${data.timestamp_actual}<br>
+            • Bucket segundo: ${data.bucket_segundo}s<br>
+            • Segundos en bucket: ${data.segundos_en_bucket}<br>
+            • Segundos restantes: ${data.segundos_restantes}<br>
+            • Micro-tolerancia: ${data.micro_tolerancia_activa ? 'SÍ' : 'NO'}<br>
+            <br>
+            <strong>Cliente sincronizado:</strong><br>
+            • Tiempo local: ${now.toISOString()}<br>
+            • Offset servidor: ${serverTimeOffset.toFixed(0)}ms<br>
+            <br>
+            <strong>Tokens:</strong><br>
+            • Actual: ${data.token_actual.substring(0, 12)}...<br>
+            • Anterior: ${data.token_anterior.substring(0, 12)}...<br>
+            • Global: ${data.current_token_global || 'null'}
+          `;
+        })
+        .catch(err => {
+          debugContent.innerHTML = '<span style="color: red;">❌ Error cargando debug info</span>';
+        });
+    }
+
+    function toggleDebug() {
+      debugMode = !debugMode;
+      debugPanel.style.display = debugMode ? 'block' : 'none';
+      
+      if (debugMode) {
+        updateDebugInfo();
+        debugTimer = setInterval(updateDebugInfo, 1000);
+      } else {
+        if (debugTimer) {
+          clearInterval(debugTimer);
+          debugTimer = null;
+        }
+      }
+    }
+
+    // ⭐ INICIALIZACIÓN DEL SISTEMA COMPLETO
+    async function initializeSystem() {
+      console.log('🚀 Inicializando sistema de QR con sincronización precisa...');
+      
+      // 1. Sincronizar con servidor primero
+      await sincronizarConServidor();
+      
+      // 2. Iniciar countdown preciso
+      updateCountdown();
+      countdownTimer = setInterval(updateCountdown, 100); // Cada 100ms
+      
+      // 3. Re-sincronizar cada 30 segundos para mantener precisión
+      syncTimer = setInterval(sincronizarConServidor, 30000);
+      
+      console.log('✅ Sistema inicializado con sincronización precisa');
+    }
+
+    // Event listeners
+    qrImg.addEventListener('load', () => {
+      console.log('🖼️ QR cargado exitosamente');
+    });
+
+    qrImg.addEventListener('error', () => {
+      console.error('❌ Error cargando QR');
+      statusEl.className = 'status warning';
+      statusEl.innerHTML = '⚠️ Error cargando QR';
+    });
+
+    // Limpiar todos los timers al salir
+    window.addEventListener('beforeunload', () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      if (countdownTimer) clearInterval(countdownTimer);
+      if (debugTimer) clearInterval(debugTimer);
+      if (syncTimer) clearInterval(syncTimer);
+    });
+
+    // Inicializar cuando la página esté completamente cargada
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initializeSystem);
+    } else {
+      initializeSystem();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Registro de Ingreso</title>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <style>
+    body {
+      background: url("static/fondo.jpg") no-repeat center center fixed;
+      background-size: cover;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .container {
+      background-color: rgba(255, 255, 255, 0.95);
+      border-radius: 20px;
+      padding: 30px;
+      text-align: center;
+      max-width: 95%;
+      width: 420px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    h2 {
+      color: #2c3e50;
+      margin-bottom: 25px;
+      font-size: 1.8em;
+      font-weight: 600;
+    }
+    .input-group {
+      margin-bottom: 20px;
+      text-align: left;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+      color: #34495e;
+    }
+    input {
+      width: 100%;
+      padding: 15px;
+      border: 2px solid #ddd;
+      border-radius: 12px;
+      font-size: 1.1em;
+      transition: all 0.3s ease;
+      box-sizing: border-box;
+    }
+    input:focus {
+      outline: none;
+      border-color: #3498db;
+      box-shadow: 0 0 10px rgba(52, 152, 219, 0.3);
+    }
+    input.valid {
+      border-color: #27ae60;
+    }
+    input.invalid {
+      border-color: #e74c3c;
+    }
+    .btn {
+      padding: 15px 25px;
+      font-size: 1.1em;
+      background: linear-gradient(45deg, #27ae60, #2ecc71);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin: 10px;
+      min-width: 200px;
+      font-weight: 500;
+    }
+    .btn:hover:not(:disabled) {
+      background: linear-gradient(45deg, #229954, #27ae60);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(39, 174, 96, 0.4);
+    }
+    .btn:disabled {
+      background: #95a5a6;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+      opacity: 0.7;
+    }
+    .btn.stop {
+      background: linear-gradient(45deg, #e74c3c, #c0392b);
+    }
+    .btn.stop:hover {
+      background: linear-gradient(45deg, #c0392b, #a93226);
+    }
+    #reader {
+      margin-top: 25px;
+      width: 100%;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .status-message {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 10px;
+      font-weight: 500;
+      display: none;
+      animation: slideIn 0.3s ease;
+      text-align: left;
+    }
+    .status-message.success {
+      background: #d4edda;
+      color: #155724;
+      border: 2px solid #c3e6cb;
+    }
+    .status-message.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 2px solid #f5c6cb;
+    }
+    .status-message.info {
+      background: #cce5ff;
+      color: #0066cc;
+      border: 2px solid #99ccff;
+    }
+    .status-message.warning {
+      background: #fff3cd;
+      color: #856404;
+      border: 2px solid #ffeaa7;
+    }
+    .loading {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid #f3f3f3;
+      border-top: 2px solid #3498db;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-left: 8px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .instructions {
+      background: #e8f4fd;
+      border: 1px solid #bee5eb;
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 20px;
+      font-size: 0.9em;
+      color: #0c5460;
+      text-align: left;
+    }
+    .security-note {
+      background: #f8f4e6;
+      border: 1px solid #f0e68c;
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 15px;
+      font-size: 0.85em;
+      color: #8b7355;
+      text-align: left;
+    }
+    .validation-message {
+      margin-top: 5px;
+      font-size: 0.85em;
+      transition: all 0.3s ease;
+    }
+    .validation-message.valid {
+      color: #27ae60;
+    }
+    .validation-message.invalid {
+      color: #e74c3c;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>📋 Registro de Asistencia</h2>
+    
+    <div class="instructions">
+      💡 <strong>Instrucciones:</strong><br>
+      1. Ingrese su cédula de identidad (10 dígitos)<br>
+      2. Presione "Escanear QR" para activar la cámara<br>
+      3. Apunte la cámara al código QR de la pantalla<br>
+      4. El registro se procesará automáticamente
+    </div>
+    
+    <div class="input-group">
+      <label for="cedula">Número de Cédula:</label>
+      <input type="text" 
+             id="cedula" 
+             placeholder="Ej: 1234567890" 
+             maxlength="10"
+             pattern="[0-9]{10}">
+      <div id="validation-message" class="validation-message"></div>
+    </div>
+    
+    <button id="scan-btn" class="btn" onclick="iniciarEscaneo()">
+      📷 Escanear Código QR
+    </button>
+    
+    <button id="stop-btn" class="btn stop" onclick="detenerEscaneo()" style="display: none;">
+      ⏹️ Detener Escaneo
+    </button>
+    
+    <div id="status-message" class="status-message"></div>
+    
+    <div id="reader" style="display:none;"></div>
+    
+    <div class="security-note">
+      🛡️ <strong>Nota de Seguridad:</strong> El código QR cambia cada 10 segundos por seguridad. 
+      No se permiten capturas de pantalla. Debe escanear el QR en tiempo real.
+    </div>
+  </div>
+
+  <script>
+    let html5QrCode = null;
+    let isScanning = false;
+    let processingRegistration = false;
+
+    const cedulaInput = document.getElementById("cedula");
+    const scanBtn = document.getElementById("scan-btn");
+    const stopBtn = document.getElementById("stop-btn");
+    const statusMessage = document.getElementById("status-message");
+    const validationMessage = document.getElementById("validation-message");
+    const readerEl = document.getElementById("reader");
+
+    // ⭐ VALIDACIÓN EN TIEMPO REAL DE CÉDULA
+    cedulaInput.addEventListener('input', function() {
+      let value = this.value.replace(/[^0-9]/g, '');
+      this.value = value;
+      
+      validateCedula(value);
+      updateScanButton();
+    });
+
+    function validateCedula(cedula) {
+      if (cedula.length === 0) {
+        cedulaInput.className = '';
+        validationMessage.textContent = '';
+        validationMessage.className = 'validation-message';
+      } else if (cedula.length < 10) {
+        cedulaInput.className = 'invalid';
+        validationMessage.textContent = `⚠️ Faltan ${10 - cedula.length} dígitos`;
+        validationMessage.className = 'validation-message invalid';
+      } else if (cedula.length === 10) {
+        cedulaInput.className = 'valid';
+        validationMessage.textContent = '✅ Cédula válida';
+        validationMessage.className = 'validation-message valid';
+      }
+    }
+
+    function updateScanButton() {
+      const cedula = cedulaInput.value.trim();
+      scanBtn.disabled = cedula.length !== 10 || isScanning || processingRegistration;
+    }
+
+    // ⭐ SISTEMA DE MENSAJES MEJORADO
+    function mostrarMensaje(mensaje, tipo = 'info', autoHide = false) {
+      statusMessage.innerHTML = mensaje;
+      statusMessage.className = `status-message ${tipo}`;
+      statusMessage.style.display = 'block';
+      
+      if (autoHide) {
+        setTimeout(() => {
+          ocultarMensaje();
+        }, 5000);
+      }
+    }
+
+    function ocultarMensaje() {
+      statusMessage.style.display = 'none';
+    }
+
+    // ⭐ FUNCIÓN DE REGISTRO CON MANEJO ROBUSTO DE ERRORES
+    async function registrarIngreso(cedula, token) {
+      if (processingRegistration) {
+        console.log('⚠️ Registro ya en proceso, ignorando...');
+        return;
+      }
+
+      processingRegistration = true;
+      mostrarMensaje('📡 Enviando registro...<span class="loading"></span>', 'info');
+      
+      try {
+        const response = await fetch('/registrar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cedula, token })
+        });
+
+        console.log('🛰️ Status respuesta:', response.status);
+        const contentType = response.headers.get('content-type');
+        console.log('🛰️ Content-Type:', contentType);
+
+        const responseText = await response.text();
+        console.log('🛰️ Respuesta completa:', responseText);
+
+        if (contentType?.includes('application/json')) {
+          const data = JSON.parse(responseText);
+          
+          if (response.ok && data.status === 'ok') {
+            mostrarMensaje('✅ <strong>¡Registro exitoso!</strong><br>Su asistencia ha sido confirmada.', 'success', true);
+            
+            // Limpiar formulario para próximo usuario
+            cedulaInput.value = '';
+            validateCedula('');
+            updateScanButton();
+            
+            // Re-enfocar en cédula después de unos segundos
+            setTimeout(() => {
+              cedulaInput.focus();
+            }, 2000);
+            
+          } else {
+            const errorMsg = data.msg || 'Error desconocido al registrar';
+            
+            if (errorMsg.includes('inválido') || errorMsg.includes('expirado')) {
+              mostrarMensaje(`❌ <strong>QR inválido o expirado</strong><br>
+                🔄 El código QR cambió durante el escaneo.<br>
+                💡 <strong>Solución:</strong> Escanee nuevamente el QR actual.`, 'warning');
+            } else if (errorMsg.includes('incompletos')) {
+              mostrarMensaje('❌ <strong>Datos incompletos</strong><br>Verifique su cédula e intente nuevamente.', 'error');
+            } else {
+              mostrarMensaje(`❌ <strong>Error:</strong> ${errorMsg}`, 'error');
+            }
+          }
+        } else {
+          mostrarMensaje('❌ <strong>Error de comunicación</strong><br>El servidor no respondió correctamente.', 'error');
+          console.error('Respuesta no JSON:', responseText.substring(0,300));
+        }
+        
+      } catch (error) {
+        console.error('Error de red completo:', error);
+        
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+          mostrarMensaje('❌ <strong>Sin conexión</strong><br>Verifique su conexión a internet e intente nuevamente.', 'error');
+        } else {
+          mostrarMensaje(`❌ <strong>Error de conexión:</strong><br>${error.message}`, 'error');
+        }
+      } finally {
+        processingRegistration = false;
+        updateScanButton();
+      }
+    }
+
+    // ⭐ FUNCIÓN DE ESCANEO MEJORADA CON VALIDACIONES
+    async function iniciarEscaneo() {
+      const cedula = cedulaInput.value.trim();
+      
+      // Validaciones previas
+      if (cedula.length !== 10) {
+        mostrarMensaje('⚠️ <strong>Cédula inválida</strong><br>Debe ingresar exactamente 10 dígitos.', 'error');
+        cedulaInput.focus();
+        return;
+      }
+
+      if (isScanning) {
+        mostrarMensaje('⚠️ Ya hay un escaneo en proceso.', 'warning');
+        return;
+      }
+
+      if (processingRegistration) {
+        mostrarMensaje('⚠️ Procesando registro anterior, espere...', 'warning');
+        return;
+      }
+
+      try {
+        mostrarMensaje('📷 Iniciando cámara...<span class="loading"></span>', 'info');
+        
+        // Actualizar UI
+        readerEl.style.display = "block";
+        scanBtn.style.display = "none";
+        stopBtn.style.display = "inline-block";
+        isScanning = true;
+        updateScanButton();
+
+        // Inicializar scanner
+        html5QrCode = new Html5Qrcode("reader");
+        
+        await html5QrCode.start(
+          { facingMode: "environment" },
+          { 
+            fps: 10, 
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 1.0,
+            formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ]
+          },
+          async (qrCodeMessage) => {
+            console.log('📱 QR detectado:', qrCodeMessage.substring(0, 30) + '...');
+            mostrarMensaje('🔍 <strong>QR detectado</strong><br>Procesando registro...', 'info');
+            
+            // Detener scanner inmediatamente para evitar múltiples lecturas
+            await detenerEscaneo();
+            
+            // Procesar el registro
+            await registrarIngreso(cedula, qrCodeMessage);
+          },
+          (errorMessage) => {
+            // Errores de escaneo continuo son normales, no mostrar
+            console.debug("Escaneando...", errorMessage);
+          }
+        );
+        
+        mostrarMensaje('📱 <strong>Cámara activa</strong><br>Apunte al código QR para escanear.<br><em>Presione "Detener" para cancelar.</em>', 'info');
+        
+      } catch (error) {
+        console.error('Error al iniciar scanner:', error);
+        
+        let errorMsg = 'Error desconocido al acceder a la cámara';
+        if (error.message.includes('Permission')) {
+          errorMsg = 'Permiso de cámara denegado. Habilite el acceso a la cámara en su navegador.';
+        } else if (error.message.includes('NotFoundError')) {
+          errorMsg = 'No se encontró cámara disponible. Verifique que su dispositivo tenga cámara.';
+        } else if (error.message.includes('NotSupportedError')) {
+          errorMsg = 'El navegador no soporta el acceso a la cámara o la conexión no es segura (HTTPS).';
+        }
+        
+        mostrarMensaje(`❌ <strong>Error de cámara:</strong><br>${errorMsg}`, 'error');
+        await detenerEscaneo();
+      }
+    }
+
+    // ⭐ FUNCIÓN PARA DETENER ESCANEO
+    async function detenerEscaneo() {
+      if (html5QrCode && isScanning) {
+        try {
+          await html5QrCode.stop();
+          console.log('📷 Scanner detenido correctamente');
+        } catch (error) {
+          console.error('Error al detener scanner:', error);
+        }
+      }
+      
+      // Resetear UI
+      html5QrCode = null;
+      isScanning = false;
+      readerEl.style.display = "none";
+      readerEl.innerHTML = "";
+      scanBtn.style.display = "inline-block";
+      stopBtn.style.display = "none";
+      
+      updateScanButton();
+      
+      // Si no hay mensaje visible, ocultar el área de mensajes
+      if (statusMessage.style.display === 'block' && 
+          (statusMessage.textContent.includes('Cámara activa') || 
+           statusMessage.textContent.includes('Iniciando cámara'))) {
+        ocultarMensaje();
+      }
+    }
+
+    // ⭐ EVENTOS ADICIONALES
+    
+    // Enter para iniciar escaneo
+    cedulaInput.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter' && this.value.length === 10 && !isScanning && !processingRegistration) {
+        iniciarEscaneo();
+      }
+    });
+
+    // Auto-focus en cédula al hacer clic en cualquier parte
+    document.addEventListener('click', function(e) {
+      if (!isScanning && e.target !== cedulaInput && !cedulaInput.value) {
+        cedulaInput.focus();
+      }
+    });
+
+    // Limpiar al salir de la página
+    window.addEventListener('beforeunload', async () => {
+      await detenerEscaneo();
+    });
+
+    // ⭐ INICIALIZACIÓN
+    document.addEventListener('DOMContentLoaded', () => {
+      updateScanButton();
+      cedulaInput.focus();
+      
+      console.log('✅ Sistema de registro inicializado');
+      console.log('🔒 Modo seguro: QR válido solo por 10 segundos');
+    });
+  </script>
+</body>
+</html>
